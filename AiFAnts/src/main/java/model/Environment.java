@@ -1,109 +1,163 @@
 package model;
 
+import java.io.*;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 
 public class Environment {
-    public int[][] gridType; // 0:Empty, 1:Wall, 2:Nest, 3:Deadly
-    public int[][] foodGrid; // Quantité de nourriture
+    public CellType[][] grid;
+    public int[][] foodAmounts; // Nouveau tableau
+    // Liste synchronisée pour éviter les conflits entre le dessin (GUI) et le mouvement (Thread)
+    public List<Ant> ants = Collections.synchronizedList(new ArrayList<>());
 
-    public QTable qTableFood; // Utilisé quand on cherche Food
-    public QTable qTableNest; // Utilisé quand on cherche Nid
+    public QTable qTableFood;
+    public QTable qTableNest;
 
-    public List<Ant> ants;
-    public List<Ant> deadAnts;
-
-    private int nestX, nestY;
-    private int totalFoodCollected = 0;
+    public int nestX, nestY;
+    public int foodCollected = 0;
 
     public Environment() {
-        gridType = new int[Constants.GRID_WIDTH][Constants.GRID_HEIGHT];
-        foodGrid = new int[Constants.GRID_WIDTH][Constants.GRID_HEIGHT];
-        qTableFood = new QTable(Constants.GRID_WIDTH, Constants.GRID_HEIGHT);
-        qTableNest = new QTable(Constants.GRID_WIDTH, Constants.GRID_HEIGHT);
-        ants = new ArrayList<>();
-        deadAnts = new ArrayList<>();
-
-        initMap(); // Créer la carte du PDF
+        grid = new CellType[Constants.GRID_WIDTH][Constants.GRID_HEIGHT];
+        foodAmounts = new int[Constants.GRID_WIDTH][Constants.GRID_HEIGHT];
+        qTableFood = new QTable();
+        qTableNest = new QTable();
+        initMap();
     }
 
     private void initMap() {
-        // Initialisation basique (Tout vide)
-        for(int x=0; x<Constants.GRID_WIDTH; x++) {
-            for(int y=0; y<Constants.GRID_HEIGHT; y++) {
-                gridType[x][y] = 0;
-                foodGrid[x][y] = 0;
+        // Initialisation vide
+        for (int x = 0; x < Constants.GRID_WIDTH; x++) {
+            for (int y = 0; y < Constants.GRID_HEIGHT; y++) {
+                grid[x][y] = CellType.EMPTY;
             }
         }
+        // Murs extérieurs
+        for (int x = 0; x < Constants.GRID_WIDTH; x++) {
+            grid[x][0] = CellType.WALL;
+            grid[x][Constants.GRID_HEIGHT - 1] = CellType.WALL;
+        }
+        for (int y = 0; y < Constants.GRID_HEIGHT; y++) {
+            grid[0][y] = CellType.WALL;
+            grid[Constants.GRID_WIDTH - 1][y] = CellType.WALL;
+        }
 
-        // Placement Nid (au centre approx pour l'exemple)
+        // Nid
         nestX = 5; nestY = 5;
-        gridType[nestX][nestY] = 2; // Nid
+        grid[nestX][nestY] = CellType.NEST;
 
-        // Mur exemple (basé sur le PDF "Mur Nourriture")
-        for(int i=10; i<15; i++) gridType[i][10] = 1;
-
-        // Zone mortelle
-        gridType[12][12] = 3;
-
-        // Nourriture 1 (20000)
-        foodGrid[15][5] = 20000;
-
-        // Nourriture 2 (1000)
-        foodGrid[15][20] = 1000;
-
-        // Ajouter les fourmis initiales au nid
-        addAntsAtNest(2, Ant.Type.EXPLORER);
-        addAntsAtNest(1, Ant.Type.SOLDIER);
-        addAntsAtNest(3, Ant.Type.HARVESTER);
+        // Nourriture
+        spawnFoodCluster(Constants.GRID_WIDTH - 10, Constants.GRID_HEIGHT - 10);
+        addRandomObstacles();
     }
 
-    private void addAntsAtNest(int count, Ant.Type type) {
-        for(int i=0; i<count; i++) {
-            ants.add(new Ant(ants.size(), nestX, nestY, type));
+    private void spawnFoodCluster(int centerX, int centerY) {
+        for (int x = centerX ; x <= centerX ; x++) {
+            for (int y = centerY ; y <= centerY ; y++) {
+                if (isValid(x, y)) grid[x][y] = CellType.FOOD;
+            }
         }
     }
+
+    private void addRandomObstacles() {
+        Random rand = new Random();
+        for(int i=0; i<30; i++) {
+            int x = rand.nextInt(Constants.GRID_WIDTH - 10) + 5;
+            int y = rand.nextInt(Constants.GRID_HEIGHT - 10) + 5;
+            if(grid[x][y] == CellType.EMPTY) grid[x][y] = CellType.WALL;
+        }
+    }
+
+    // --- Gestion des Fourmis ---
+
+    public void spawnWave(int count, Ant.Type type) {
+        for (int i = 0; i < count; i++) {
+            ants.add(new Ant(nestX, nestY, type));
+        }
+        System.out.println("Vague lancée : " + count + " " + type);
+    }
+
+    public void cleanupDeadAnts() {
+        ants.removeIf(ant -> ant.isDead);
+    }
+
+    // --- Helpers de Navigation ---
 
     public boolean isValid(int x, int y) {
         return x >= 0 && x < Constants.GRID_WIDTH && y >= 0 && y < Constants.GRID_HEIGHT;
     }
 
-    public boolean isWall(int x, int y) { return gridType[x][y] == 1; }
-    public boolean isDeadly(int x, int y) { return gridType[x][y] == 3; }
-    public boolean isNest(int x, int y) { return gridType[x][y] == 2; }
-    public boolean hasFood(int x, int y) { return foodGrid[x][y] > 0; }
-
-    public int takeFood(int x, int y, int capacity) {
-        int available = foodGrid[x][y];
-        int taken = Math.min(available, capacity);
-        foodGrid[x][y] -= taken;
-        return taken;
+    public boolean[] getPossibleActions(int x, int y) {
+        boolean[] possible = new boolean[4];
+        possible[0] = isWalkable(x, y - 1); // Haut
+        possible[1] = isWalkable(x, y + 1); // Bas
+        possible[2] = isWalkable(x - 1, y); // Gauche
+        possible[3] = isWalkable(x + 1, y); // Droite
+        return possible;
     }
 
-    public void dropFoodAtNest(int amount) {
-        totalFoodCollected += amount;
+    private boolean isWalkable(int x, int y) {
+        return isValid(x, y) && grid[x][y] != CellType.WALL;
     }
 
-    public void killAnt(Ant a) {
-        deadAnts.add(a);
-    }
+    // --- SAUVEGARDE ET CHARGEMENT (Appelés par GUI) ---
 
-    public void cleanupDeadAnts() {
-        ants.removeAll(deadAnts);
-        deadAnts.clear();
-    }
-
-    // Helper pour les fourmis
-    public boolean[] getPossibleMoves(int x, int y) {
-        boolean[] moves = new boolean[4];
-        int[][] dirs = {{0,-1}, {0,1}, {-1,0}, {1,0}};
-        for(int i=0; i<4; i++) {
-            int nx = x + dirs[i][0];
-            int ny = y + dirs[i][1];
-            moves[i] = isValid(nx, ny) && !isWall(nx, ny);
+    public void saveState() {
+        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream("brain.dat"))) {
+            out.writeObject(qTableFood);
+            out.writeObject(qTableNest);
+            System.out.println("Sauvegarde effectuée dans brain.dat");
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-        return moves;
     }
 
-    public int getTotalFoodCollected() { return totalFoodCollected; }
+    public void loadState() {
+        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream("brain.dat"))) {
+            this.qTableFood = (QTable) in.readObject();
+            this.qTableNest = (QTable) in.readObject();
+            System.out.println("Chargement réussi !");
+        } catch (IOException | ClassNotFoundException e) {
+            System.err.println("Erreur de chargement (fichier inexistant ?) : " + e.getMessage());
+        }
+    }
+
+    // 1. Ajouter de la nourriture à la souris
+    public void setCell(int x, int y, CellType type) {
+        if (isValid(x, y) && grid[x][y] != CellType.NEST) {
+            grid[x][y] = type;
+            if (type == CellType.FOOD) {
+                foodAmounts[x][y] = 100000; // <--- Chaque clic pose 5 unités de nourriture
+            } else {
+                foodAmounts[x][y] = 0;
+            }
+        }
+    }
+
+    // 2. Tuer les fourmis sur une case (Mode Tueur)
+    public void killAntsAt(int x, int y) {
+        synchronized (ants) {
+            for (Ant a : ants) {
+                // Si la fourmi est sur la case (avec une petite marge pour la souris)
+                if (Math.abs(a.x - x) <= 1 && Math.abs(a.y - y) <= 1) {
+                    a.isDead = true;
+                }
+            }
+        }
+    }
+
+    // 3. Faire apparaître de la nourriture aléatoirement (Bouton Magic)
+    public void spawnRandomFood(int amount) {
+        java.util.Random rand = new java.util.Random();
+        int placed = 0;
+        while (placed < amount) {
+            int x = rand.nextInt(Constants.GRID_WIDTH);
+            int y = rand.nextInt(Constants.GRID_HEIGHT);
+            if (grid[x][y] == CellType.EMPTY) {
+                setCell(x, y, CellType.FOOD); // Utilise setCell pour mettre la qté à 5
+                placed++;
+            }
+        }
+    }
 }

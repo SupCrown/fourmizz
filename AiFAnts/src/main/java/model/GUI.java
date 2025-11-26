@@ -2,63 +2,230 @@ package model;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.*;
 
 public class GUI extends JPanel {
     private Environment env;
-    private int cellSize = 20;
+    private static final int CELL_SIZE = 20;
+
+    // Interface
+    private static JSlider speedSlider;
+    private static JLabel statsLabel;
+
+    // Contrôles de Spawn (remis !)
+    private static JComboBox<Ant.Type> typeSelector;
+    private static JTextField countField;
+
+    // Outils Souris
+    private enum Tool { NONE, FOOD, KILL, ERASER }
+    private static Tool currentTool = Tool.NONE;
 
     public GUI(Environment env) {
         this.env = env;
-        this.setPreferredSize(new Dimension(Constants.GRID_WIDTH * cellSize, Constants.GRID_HEIGHT * cellSize));
+        this.setPreferredSize(new Dimension(Constants.GRID_WIDTH * CELL_SIZE, Constants.GRID_HEIGHT * CELL_SIZE));
+
+        MouseAdapter mouseHandler = new MouseAdapter() {
+            public void mousePressed(MouseEvent e) { useTool(e); }
+            public void mouseDragged(MouseEvent e) { useTool(e); }
+        };
+        this.addMouseListener(mouseHandler);
+        this.addMouseMotionListener(mouseHandler);
+    }
+
+    private void useTool(MouseEvent e) {
+        int x = e.getX() / CELL_SIZE;
+        int y = e.getY() / CELL_SIZE;
+        if (x >= 0 && x < Constants.GRID_WIDTH && y >= 0 && y < Constants.GRID_HEIGHT) {
+            if (currentTool == Tool.FOOD) env.setCell(x, y, CellType.FOOD);
+            else if (currentTool == Tool.ERASER) env.setCell(x, y, CellType.EMPTY);
+            else if (currentTool == Tool.KILL) env.killAntsAt(x, y);
+            repaint();
+        }
     }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
 
-        // 1. Dessiner la grille
-        for (int x = 0; x < Constants.GRID_WIDTH; x++) {
-            for (int y = 0; y < Constants.GRID_HEIGHT; y++) {
-                int px = x * cellSize;
-                int py = y * cellSize;
+        // 1. DESSINER TERRAIN
+        for(int x=0; x<Constants.GRID_WIDTH; x++) {
+            for(int y=0; y<Constants.GRID_HEIGHT; y++) {
+                int px = x * CELL_SIZE;
+                int py = y * CELL_SIZE;
 
-                // Fond selon type
-                if (env.gridType[x][y] == 1) g.setColor(Color.DARK_GRAY); // Mur
-                else if (env.gridType[x][y] == 2) g.setColor(Color.BLUE); // Nid
-                else if (env.gridType[x][y] == 3) g.setColor(Color.RED);  // Danger
-                else g.setColor(Color.WHITE); // Vide
+                CellType type = env.grid[x][y];
+                g.setColor(Color.WHITE);
 
-                // Nourriture
-                if (env.foodGrid[x][y] > 0) {
-                    g.setColor(Color.GREEN);
+                if(type == CellType.WALL) g.setColor(Color.DARK_GRAY);
+                else if(type == CellType.NEST) g.setColor(new Color(100, 100, 255));
+                else if(type == CellType.FOOD) {
+                    // La nourriture devient plus pâle si elle est presque finie
+                    int amount = env.foodAmounts[x][y];
+                    int green = Math.max(50, 255 - (amount * 40));
+                    g.setColor(new Color(50, 200, 50));
                 }
 
-                g.fillRect(px, py, cellSize, cellSize);
-                g.setColor(Color.LIGHT_GRAY);
-                g.drawRect(px, py, cellSize, cellSize);
+                g.fillRect(px, py, CELL_SIZE, CELL_SIZE);
 
-                // Visualisation phéromones (Optionnel : opacité)
-                // Ici on simplifie, on ne dessine pas les chiffres des Q-Values pour la lisibilité
+                // Afficher qté nourriture (petit texte si > 1)
+                if(type == CellType.FOOD && env.foodAmounts[x][y] > 0) {
+                    g.setColor(Color.BLACK);
+                    g.setFont(new Font("Arial", Font.PLAIN, 10));
+                    g.drawString(""+env.foodAmounts[x][y], px+5, py+14);
+                }
+
+                g.setColor(new Color(240, 240, 240)); // Grille très légère
+                g.drawRect(px, py, CELL_SIZE, CELL_SIZE);
+
+                // PHÉROMONES
+                if(type == CellType.EMPTY) {
+                    double val = env.qTableFood.getMaxValue(x, y);
+                    if(val > 0) {
+                        float alpha = Math.min(1.0f, (float)val / 100.0f);
+                        g.setColor(new Color(0, 255, 0, (int)(alpha * 80)));
+                        g.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+                    }
+                }
             }
         }
 
-        // 2. Dessiner les fourmis
-        for (Ant ant : env.ants) {
-            int px = ant.getX() * cellSize;
-            int py = ant.getY() * cellSize;
+        // 2. DESSINER FOURMIS
+        Graphics2D g2 = (Graphics2D) g;
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setStroke(new BasicStroke(2)); // Trait plus épais pour le cercle vide
 
-            if (ant.getType() == Ant.Type.EXPLORER) g.setColor(new Color(100, 100, 255));
-            else if (ant.getType() == Ant.Type.SOLDIER) g.setColor(new Color(255, 100, 100));
-            else g.setColor(Color.BLACK); // Harvester
+        Ant[] drawAnts = env.ants.toArray(new Ant[0]);
+        for(Ant ant : drawAnts) {
+            if(ant.isDead) continue;
+            int ax = ant.x * CELL_SIZE;
+            int ay = ant.y * CELL_SIZE;
 
-            // Si elle porte à manger -> cercle plein, sinon cercle vide
-            if(ant.getState() == Ant.State.RETURNING)
-                g.fillOval(px+4, py+4, cellSize-8, cellSize-8);
-            else
-                g.drawOval(px+4, py+4, cellSize-8, cellSize-8);
+            // COULEUR SELON LE TYPE
+            switch(ant.getType()) {
+                case HARVESTER: g2.setColor(Color.BLACK); break;
+                case EXPLORER:  g2.setColor(Color.BLUE); break;
+                case SOLDIER:   g2.setColor(Color.MAGENTA); break;
+                default:        g2.setColor(Color.DARK_GRAY);
+            }
+
+            // VISUEL : REMPLI SI NOURRITURE, VIDE SINON
+            if (ant.hasFood) {
+                g2.fillOval(ax + 3, ay + 3, CELL_SIZE - 6, CELL_SIZE - 6);
+            } else {
+                g2.drawOval(ax + 3, ay + 3, CELL_SIZE - 6, CELL_SIZE - 6);
+            }
         }
+    }
 
-        g.setColor(Color.BLACK);
-        g.drawString("Nourriture Nid: " + env.getTotalFoodCollected(), 10, 20);
+    public static void createAndShowGUI(Environment env) {
+        JFrame frame = new JFrame("AiFAnts - Ultimate Version");
+        frame.setLayout(new BorderLayout());
+        GUI drawingPanel = new GUI(env);
+        frame.add(drawingPanel, BorderLayout.CENTER);
+
+        // --- HAUT : STATS ---
+        statsLabel = new JLabel("Initialisation...", SwingConstants.CENTER);
+        statsLabel.setFont(new Font("Arial", Font.BOLD, 14));
+        frame.add(statsLabel, BorderLayout.NORTH);
+
+        // --- BAS : CONTRÔLES ---
+        JPanel bottomPanel = new JPanel();
+        bottomPanel.setLayout(new BoxLayout(bottomPanel, BoxLayout.Y_AXIS));
+
+        // Ligne 1 : Outils Souris
+        JPanel toolLine = new JPanel();
+        toolLine.add(new JLabel("Outil: "));
+        ButtonGroup bg = new ButtonGroup();
+
+        JRadioButton rbNone = new JRadioButton("Rien", true);
+        rbNone.addActionListener(e -> currentTool = Tool.NONE);
+
+        JRadioButton rbFood = new JRadioButton("Bouffe (+5)");
+        rbFood.addActionListener(e -> currentTool = Tool.FOOD);
+
+        JRadioButton rbKill = new JRadioButton("Tueur");
+        rbKill.addActionListener(e -> currentTool = Tool.KILL);
+
+        JRadioButton rbEraser = new JRadioButton("Gomme");
+        rbEraser.addActionListener(e -> currentTool = Tool.ERASER);
+
+        bg.add(rbNone); bg.add(rbFood); bg.add(rbKill); bg.add(rbEraser);
+        toolLine.add(rbNone); toolLine.add(rbFood); toolLine.add(rbKill); toolLine.add(rbEraser);
+
+        JButton btnRand = new JButton("Pop Aléatoire (x5)");
+        btnRand.addActionListener(e -> { env.spawnRandomFood(5); drawingPanel.repaint(); });
+        toolLine.add(btnRand);
+
+        // Ligne 2 : Simulation & Spawn
+        JPanel simLine = new JPanel();
+
+        // Vitesse
+        speedSlider = new JSlider(0, 200, 20);
+        speedSlider.setInverted(true);
+        speedSlider.setPreferredSize(new Dimension(100, 20));
+        simLine.add(new JLabel("Vitesse:"));
+        simLine.add(speedSlider);
+
+        simLine.add(new JSeparator(SwingConstants.VERTICAL));
+
+        // Spawn (Remis !)
+        typeSelector = new JComboBox<>(Ant.Type.values());
+        countField = new JTextField("10", 3);
+        JButton btnSpawn = new JButton("Lancer !");
+
+        btnSpawn.addActionListener(e -> {
+            try {
+                int n = Integer.parseInt(countField.getText());
+                Ant.Type t = (Ant.Type) typeSelector.getSelectedItem();
+                env.spawnWave(n, t);
+            } catch(Exception ex) { ex.printStackTrace(); }
+        });
+
+        simLine.add(new JLabel("Ajouter:"));
+        simLine.add(countField);
+        simLine.add(typeSelector);
+        simLine.add(btnSpawn);
+
+        // Save/Load
+        JButton btnSave = new JButton("S");
+        btnSave.addActionListener(e -> env.saveState());
+        JButton btnLoad = new JButton("L");
+        btnLoad.addActionListener(e -> env.loadState());
+        simLine.add(btnSave);
+        simLine.add(btnLoad);
+
+        bottomPanel.add(toolLine);
+        bottomPanel.add(simLine);
+        frame.add(bottomPanel, BorderLayout.SOUTH);
+
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.pack();
+        frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
+
+        // --- THREAD ---
+        new Thread(() -> {
+            long tick = 0;
+            while(tick < Constants.MAX_TICKS) {
+                try {
+                    Ant[] currentAnts = env.ants.toArray(new Ant[0]);
+                    for(Ant a : currentAnts) a.update((int)tick, env);
+                    env.cleanupDeadAnts();
+                    env.qTableFood.applyUpdatesAndDecay();
+                    env.qTableNest.applyUpdatesAndDecay();
+
+                    final long t = tick;
+                    SwingUtilities.invokeLater(() -> {
+                        statsLabel.setText(String.format("Fourmis: %d | Stock Nid: %d | Tick: %d",
+                                env.ants.size(), env.foodCollected, t));
+                        drawingPanel.repaint();
+                    });
+
+                    int d = speedSlider.getValue();
+                    if(d > 0) Thread.sleep(d);
+                    tick++;
+                } catch(Exception e) { e.printStackTrace(); }
+            }
+        }).start();
     }
 }

@@ -1,4 +1,4 @@
-package main.java.model;
+package model;
 
 public enum AntType {
     EXPLORER,   // Explore et cherche la nourriture
