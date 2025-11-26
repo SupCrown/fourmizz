@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/AiFAnts.iml" filepath="$PROJECT_DIR$/AiFAnts.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/AiFAnts.main.iml" filepath="$PROJECT_DIR$/.idea/modules/AiFAnts.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/AiFAnts.test.iml" filepath="$PROJECT_DIR$/.idea/modules/AiFAnts.test.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/fourmizzz.iml" filepath="$PROJECT_DIR$/.idea/fourmizzz.iml" />
+    </modules>
+  </component>
+</project>
