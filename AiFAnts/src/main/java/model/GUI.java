@@ -86,6 +86,14 @@ public class GUI extends JPanel {
                         g.fillRect(px, py, CELL_SIZE, CELL_SIZE);
                     }
                 }
+                if(type == CellType.EMPTY) {
+                    double val = env.qTableNest.getMaxValue(x, y);
+                    if(val > 0) {
+                        float alpha = Math.min(1.0f, (float)val / 100.0f);
+                        g.setColor(new Color(0, 0, 255, (int)(alpha * 80)));
+                        g.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+                    }
+                }
             }
         }
 
@@ -102,9 +110,9 @@ public class GUI extends JPanel {
 
             // COULEUR SELON LE TYPE
             switch(ant.getType()) {
-                case HARVESTER: g2.setColor(Color.BLACK); break;
+                case HARVESTER: g2.setColor(Color.red); break;
                 case EXPLORER:  g2.setColor(Color.BLUE); break;
-                case SOLDIER:   g2.setColor(Color.MAGENTA); break;
+                case SOLDIER:   g2.setColor(Color.yellow); break;
                 default:        g2.setColor(Color.DARK_GRAY);
             }
 
@@ -118,7 +126,7 @@ public class GUI extends JPanel {
     }
 
     public static void createAndShowGUI(Environment env) {
-        JFrame frame = new JFrame("AiFAnts - Ultimate Version");
+        JFrame frame = new JFrame("AiFAnts");
         frame.setLayout(new BorderLayout());
         GUI drawingPanel = new GUI(env);
         frame.add(drawingPanel, BorderLayout.CENTER);

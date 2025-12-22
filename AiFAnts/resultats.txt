@@ -1,0 +1,18 @@
+Auteurs : Kebaili - Bloise
+1. État Général de l'Application
+
+L’application est fonctionnelle et stable. Le moteur de simulation tourne correctement et l'interface utilisateur (GUI) réagit de manière fluide aux interactions. L'architecture globale du projet répond aux exigences techniques fixées.
+2. Analyse de l'Intelligence Artificielle (Q-Learning)
+
+L'implémentation des Q-Tables montre des résultats contrastés selon le type d'agent :
+
+    Performance des Exploratrices : Le système fonctionne bien pour les fourmis de type "Explorateur". Elles parviennent à cartographier l'environnement et à initier l'apprentissage.
+    Problème de Saturation (Récolteuses) : Une anomalie est observée lorsque le nombre de fourmis "Récolteuses" (Harvesters) devient important. Elles tendent à "surcharger" les Q-Tables (valeurs aberrantes ou bruit excessif sur la carte des phéromones).
+    Hypothèse Technique : L'analyse suggère que ce problème ne vient pas de la structure fondamentale des Q-Tables (le code logique), mais plutôt du réglage fin des hyper-paramètres (taux d'apprentissage, évaporation, récompenses) qui entraîne une propagation trop agressive des valeurs lors des mouvements de masse.
+
+3. Fonctionnalités de l'Interface
+
+L'interface utilisateur offre un contrôle total sur la simulation via plusieurs fonctionnalités opérationnelles :
+
+    Interaction en temps réel : Possibilité de faire apparaître des vagues de fourmis, de déposer de la nourriture manuellement ou de supprimer des obstacles/éléments.
+    Persistance des données : Le système de sauvegarde et de chargement des Q-Tables est fonctionnel, permettant de conserver "l'intelligence" acquise entre deux sessions de simulation.

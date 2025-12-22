@@ -1,0 +1,71 @@
+Manuel d’Utilisation - Projet AIfant
+
+Simulation de Fourmilière par Apprentissage (Q-Learning)
+1. Introduction
+
+Cette application simule une colonie de fourmis intelligentes. Les fourmis doivent apprendre à naviguer dans un environnement inconnu pour trouver de la nourriture et la ramener au nid. Elles utilisent deux cartes cognitives distinctes (Q-Tables) pour se repérer, visualisables en temps réel.
+2. Légende Visuelle (Qui est qui ?)
+Les Agents (Fourmis)
+
+Chaque type de fourmi a un rôle précis dans la colonie, identifié par sa couleur :
+
+    Fourmi Exploratrice (Bleu) : Son rôle est de découvrir la carte. Elle a un taux d'aléatoire (Epsilon) très élevé (70% par défaut) pour ne pas rester bloquée dans les chemins connus.
+    Fourmi Récolteuse (Rouge) : Son rôle est l'efficacité. Elle suit scrupuleusement les pistes de phéromones (Epsilon faible, 20%) pour maximiser le transport de nourriture.
+    Fourmi Soldat (Jaune) : Un agent polyvalent conçu pour la défense ou la patrouille (taux d'exploration moyen, 40%).
+
+L'Environnement
+
+    Carré Bleu Unique : Le Nid. Point de départ et de retour obligatoire.
+    Carrés Verts Foncé : La Nourriture (Ressources).
+    Carrés Rouges/Marrons : Obstacles et murs infranchissables.
+
+La Visualisation de l'IA (Les Traces au Sol)
+
+L'intelligence artificielle est affichée en transparence par-dessus le terrain :
+
+    Trace VERTE : Indique le chemin vers la Nourriture. Les fourmis libres suivent le vert.
+    Trace BLEUE : Indique le chemin vers le Nid. Les fourmis chargées de nourriture suivent le bleu.
+
+3. Contrôles et Interface
+Interactions Directes (Souris)
+
+    Clic Gauche : Ajouter un élément (Nourriture ou Mur selon le mode).
+    Clic Droit : Supprimer l'élément ciblé.
+
+Panneau Latéral
+
+    Vitesse (Slider) : Accélère la simulation pour entraîner l'IA rapidement, ou la ralentit pour observer le comportement individuel.
+    Ajouter Fourmis : Fait apparaître une nouvelle vague d'agents.
+    Sauvegarde/Chargement (Q-Tables) :
+        Sauvegarder : Exporte l'intelligence actuelle (les traces vertes et bleues) dans un fichier.
+        Charger : Importe une intelligence pré-entrainée. Les nouvelles fourmis connaîtront immédiatement le chemin sans explorer.
+
+4. Configuration Technique (Fichier Constants.java)
+
+Pour les utilisateurs avancés ou développeurs, le comportement profond de la simulation est modifiable dans le fichier src/model/Constants.java. Il n'est pas nécessaire de recoder la logique, il suffit d'ajuster ces valeurs :
+Dimensions et Temps
+
+public static final int GRID_WIDTH = 40;  // Largeur de la grille
+public static final int GRID_HEIGHT = 30; // Hauteur de la grille
+
+Système de Récompenses (Le Cerveau de l'IA)
+
+C'est ce qui "motive" les fourmis.
+
+    REWARD_GOAL = 1000.0 : La grosse récompense quand elles atteignent leur but (Nid ou Bouffe).
+    REWARD_DEATH = -100.0 : La punition si elles meurent.
+    REWARD_STEP = -1.0 : Le coût de l'énergie. Plus ce chiffre est négatif, plus les fourmis chercheront le chemin le plus court.
+
+Paramètres d'Apprentissage (Ajustement Fin)
+
+    DEFAULT_ALPHA = 0.3 : Vitesse d'apprentissage. (0 = n'apprend rien, 1 = oublie tout pour la nouvelle info).
+    DEFAULT_GAMMA = 0.9 : Vision à long terme. (Plus c'est proche de 1, plus la fourmi pense aux récompenses futures).
+    DECAY_RATE = 0.0001 : Évaporation. Vitesse à laquelle les pistes (vertes/bleues) disparaissent si elles ne sont pas utilisées.
+
+Taux d'Exploration (Epsilon)
+
+Définit le pourcentage de chance qu'une fourmi fasse un mouvement totalement aléatoire au lieu de suivre son intelligence.
+
+    EPSILON_EXPLORER = 0.7 : Les Bleues explorent 70% du temps.
+    EPSILON_SOLDIER = 0.4 : Les Jaunes explorent 40% du temps.
+    EPSILON_HARVESTER = 0.2 : Les Rouges n'explorent que 20% du temps (suivent les ordres).

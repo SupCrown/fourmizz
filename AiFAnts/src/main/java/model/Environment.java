@@ -88,6 +88,8 @@ public class Environment {
         return x >= 0 && x < Constants.GRID_WIDTH && y >= 0 && y < Constants.GRID_HEIGHT;
     }
 
+
+
     public boolean[] getPossibleActions(int x, int y) {
         boolean[] possible = new boolean[4];
         possible[0] = isWalkable(x, y - 1); // Haut
@@ -160,4 +162,5 @@ public class Environment {
             }
         }
     }
+
 }
